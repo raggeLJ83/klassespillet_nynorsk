@@ -17,7 +17,8 @@ export function visOm() {
       <p><a href="https://www.laererliv.no" target="_blank" rel="noopener">www.laererliv.no</a><br />
         <a href="mailto:kenneth@laererliv.no">kenneth@laererliv.no</a></p>
     </div>
-        <div class="om-tilpassing">
+ 
+    <div class="om-tilpassing">
       <h3>Om denne utgåva</h3>
       <p>Dette er ei tilpassa nynorskutgåve av Klassespillet, utvikla av Kenneth Bareksten (Lærerliv).</p>
       <p><strong>Tilpassingar:</strong> Valfri speletid, nynorsk språk og seks ferdige stjernelodd, der eitt gir to stjerner.</p>
@@ -26,6 +27,7 @@ export function visOm() {
       </p>
       <p>Originalkoden er publisert under MIT-lisensen.</p>
     </div>
+  
   
     <form method="dialog" class="hjem-knapper">
       <button class="knapp knapp-hoved">Lukk</button>
