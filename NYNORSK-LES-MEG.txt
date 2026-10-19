@@ -1,0 +1,6 @@
+Klassespillet – lokal versjon (nynorsk), med valfri speletid og seks stjernelodd.
+Fem lodd: 1 stjerne. Eitt lodd: 2 stjerner. Sannsyn: 1/6 for to stjerner.
+
+Opne som før med den lokale startmåten. Viss ei tidlegare klasse alt er sett opp i nettlesaren, kan det gamle valet vere lagra. Gå til Endre oppsett og skriv inn dei seks lodda, eller opprett ny klasse.
+
+Originalkode: https://github.com/barx10/klassespillet (MIT-lisens)

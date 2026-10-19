@@ -1,0 +1,10 @@
+KLASSESPIlLET – LEGG UT SOM NETTSIDE
+
+1. Gå til https://github.com og logg inn eller opprett ein gratis konto.
+2. Vel New repository. Kall det til dømes klassespillet-nynorsk og vel Public. Opprett repository.
+3. Pakk ut denne ZIP-fila på PC-en.
+4. I det nye GitHub-repositoriet: Vel Add file → Upload files. Dra inn alle filene OG undermappene frå den utpakka mappa. index.html må liggje øvst, ikkje i ei ekstra undermappe. Vel Commit changes.
+5. Vel Settings → Pages → Build and deployment → Deploy from a branch. Vel main og /(root), deretter Save.
+6. Vent litt på publiseringa. Adressa blir vanlegvis https://BRUKARNAMN.github.io/klassespillet-nynorsk/
+
+OBS: Sida er offentleg tilgjengeleg. Ikkje legg inn elevnamn eller personopplysningar i kjeldekoden. Appen blir ikkje hosta av ChatGPT. Filene bruker MIT-lisensen frå originalprosjektet; bevar LICENSE.

@@ -1,0 +1,1180 @@
+import { les, skriv, nyKlasse } from './lager.js';
+import { BIBLIOTEK, FORSLAG, MAKS_REGLER, fraBibliotek, egetRegelsett, rosForslag } from './regler.js';
+import * as Okt from './okt.js';
+import { lagLandskap, punkt } from './landskap.js';
+import * as Logg from './logg.js';
+import { lagDiagram } from './diagram.js';
+import { veiledning, elevveiledning } from './veiledning.js';
+import { visOpplaering } from './opplaering.js';
+import { visOm } from './om.js';
+import { lagSpiller } from './animasjon.js';
+
+const app = document.getElementById('app');
+let tilstand = les();
+let stopp = () => {};
+
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+const lagre = () => skriv(tilstand);
+const klasse = () => tilstand.klasser.find((k) => k.id === tilstand.aktivKlasseId) ?? tilstand.klasser[0];
+const regelsettFor = (k) => k.regelsett.find((r) => r.id === k.sisteRegelsettId) ?? k.regelsett[0];
+const redusertBevegelse = () =>
+  matchMedia('(prefers-reduced-motion: reduce)').matches || klasse()?.innstillinger.animasjon === false;
+
+// ---------- Tema ----------
+
+function settTema(tema) {
+  if (tema) document.documentElement.dataset.tema = tema;
+  else delete document.documentElement.dataset.tema;
+  localStorage.setItem('klassespillet-tema', tema ?? '');
+}
+settTema(localStorage.getItem('klassespillet-tema') || null);
+
+function erMorkt() {
+  const valgt = document.documentElement.dataset.tema;
+  return valgt ? valgt === 'mork' : matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+// ---------- Visninger ----------
+
+// naa er visningen som vises, så veiledningene vet hvor Tilbake skal gå.
+// forlat spør først når oppsettet har endringer som ikke er lagret.
+let naa = null;
+let forlat = (videre) => videre();
+
+function vis(visning) {
+  stopp();
+  stopp = () => {};
+  forlat = (videre) => videre();
+  naa = visning;
+  app.innerHTML = '';
+  document.body.classList.remove('uten-bunntekst');
+  visning();
+}
+
+const tilLaerer = () => { const fra = naa; vis(() => veiledningSide(fra)); };
+const tilElev = () => { const fra = naa; vis(() => elevSide(fra)); };
+const opplaering = () => visOpplaering({ tilVeiledning: () => forlat(tilLaerer) });
+
+// Topplinja står på alle sider utenom velkomst og spill. Uten tilbake er
+// dette hjem, og da står navnet på appen der Tilbake ellers står.
+function topplinje(tilbake) {
+  const linje = document.createElement('header');
+  linje.className = 'topplinje';
+  linje.innerHTML = `
+    ${tilbake
+      ? '<button class="topp-tilbake" id="topp-tilbake"><span aria-hidden="true">‹</span> Tilbake</button>'
+      : '<button class="topp-merke" id="topp-merke" title="Til velkomstskjermen">Klassespillet</button>'}
+    <nav class="topp-meny" aria-label="Meny">
+      <button class="lenke" id="topp-laerer">Lærarrettleiing</button>
+      <button class="lenke" id="topp-elev">Elevrettleiing</button>
+      <button class="lenke" id="topp-tema">${erMorkt() ? 'Lys visning' : 'Mørk visning'}</button>
+    </nav>`;
+  app.prepend(linje);
+  linje.querySelector('#topp-tilbake')?.addEventListener('click', () => forlat(() => vis(tilbake)));
+  linje.querySelector('#topp-merke')?.addEventListener('click', () => vis(velkomst));
+  linje.querySelector('#topp-laerer').onclick = () => forlat(tilLaerer);
+  linje.querySelector('#topp-elev').onclick = () => forlat(tilElev);
+  linje.querySelector('#topp-tema').onclick = (e) => {
+    settTema(erMorkt() ? 'lys' : 'mork');
+    e.currentTarget.textContent = erMorkt() ? 'Lys visning' : 'Mørk visning';
+  };
+}
+
+// Spør før endringer i oppsettet forkastes.
+function bekreftForlat(videre) {
+  const d = document.createElement('dialog');
+  d.className = 'dialog';
+  d.innerHTML = `
+    <p>Du har endringer som ikkje er lagra.</p>
+    <form method="dialog" class="hjem-knapper">
+      <button class="knapp knapp-hoved" value="bli">Hald fram med å redigere</button>
+      <button class="knapp knapp-stille" value="forkast">Forkast endringane</button>
+    </form>`;
+  document.body.append(d);
+  d.addEventListener('close', () => {
+    d.remove();
+    if (d.returnValue === 'forkast') videre();
+  });
+  d.showModal();
+}
+
+// Startsiden før første klasse. Her kan læreren se seg rundt uten å fylle ut noe.
+// Landskapet vises uten brett, siden spillbrett og målfelt ikke er valgt ennå.
+function tomHjem() {
+  forHjem(`
+        <h1 class="heim-klasse tom-tittel">Velkomen</h1>
+        <p class="hjem-mal">Klassen spelar saman om å følgje tre reglar. Klarer de det, trekkjer de eit lodd frå klassens val.</p>
+        <div class="hjem-knapper">
+          <button class="knapp knapp-hoved" id="ny-klasse">Set opp klassen</button>
+          <button class="knapp knapp-stille" id="gjennomgang">Slik fungerer det</button>
+        </div>
+        <p class="hjem-varsel">Vil du lese først? Lærarrettleiinga forklarar metoden og forskinga.
+          Elevrettleiinga kan du vise på tavla når du introduserer spelet.</p>`, { brett: false });
+  topplinje(null);
+  app.querySelector('#ny-klasse').onclick = () => vis(() => oppsett({ ny: true }));
+  app.querySelector('#gjennomgang').onclick = opplaering;
+  app.querySelector('#ny-klasse').focus();
+}
+
+function hjem() {
+  const k = klasse();
+  if (!k) return tomHjem();
+  if (tilstand.pagaende) return vis(spill);
+
+  const rs = regelsettFor(k);
+  const inn = k.innstillinger;
+  const variant = k.variant ?? 'rolig';
+  const mal = {
+    rolig: `Kom til felt ${inn.maalfelt}, så trekkjer de klassens val.`,
+    brudd: `Hald dykk under ${inn.bruddgrense} brudd, så trekkjer de klassens val.`,
+    lag: `Spel i ${inn.antallLag === 3 ? 'tre' : 'to'} lag. Får ett lag minst ${inn.stjernekrav} stjerner, trekkjer heile klassen klassens val.`,
+  }[variant];
+  const nye = Logg.trengerNyeForslag(k);
+  forHjem(`
+        <h1 class="hjem-klasse">${esc(k.navn)}</h1>
+        <p class="hjem-mal">${mal}</p>
+        <p class="hjem-regelsett">${esc(rs.navn)}</p>
+        <ol class="hjem-regler">${rs.regler.map((r) => `<li>${esc(r.tekst)}</li>`).join('')}</ol>
+        <div class="hjem-knapper">
+          <button class="knapp knapp-hoved" id="start">Start økt</button>
+          <button class="knapp knapp-stille" id="kartlegg">Kartlegg</button>
+          <button class="knapp knapp-stille" id="logg">Logg</button>
+        </div>
+        ${k.klassensValg.length === 0 ? '<p class="hjem-varsel">Legg inn klassens val i oppsettet før de spelar.</p>' : ''}
+        ${nye ? `
+          <div class="heim-varsel paminn-val">
+            <p>${nye === 'pause'
+              ? 'Det er over to veker sidan sist. Vil de endre lodda?'
+              : 'Det er fire veker sidan sist. Vil de endre lodda?'}</p>
+            <div class="hjem-lenker">
+              <button class="lenke" id="nye-valg">Oppdater lista</button>
+              <button class="lenke" id="valg-ok">Lista er framleis rett</button>
+            </div>
+          </div>` : ''}
+        <nav class="hjem-lenker" aria-label="Klassen">
+          <button class="lenke" id="endre">Endre oppsett</button>
+          <button class="lenke" id="klasser">${tilstand.klasser.length > 1 ? 'Bytt klasse' : 'Ny klasse'}</button>
+        </nav>`, { brett: variant === 'rolig' });
+  topplinje(null);
+  app.querySelector('#start').onclick = () => vis(sjekkliste);
+  app.querySelector('#klasser').onclick = () => vis(tilstand.klasser.length > 1 ? klasser : () => oppsett({ ny: true }));
+  app.querySelector('#nye-valg')?.addEventListener('click', () => vis(() => oppsett({ fokus: 'klassensValg' })));
+  app.querySelector('#valg-ok')?.addEventListener('click', () => {
+    k.sisteBelonningskartlegging = Logg.dato(new Date());
+    lagre();
+    vis(hjem);
+  });
+  app.querySelector('#kartlegg').onclick = () => vis(kartleggingStart);
+  app.querySelector('#logg').onclick = () => vis(logg);
+  app.querySelector('#endre').onclick = () => vis(oppsett);
+  app.querySelector('#start').focus();
+}
+
+// Velkomstskjermen vises hver gang appen åpnes, men ikke midt i en økt.
+function velkomst() {
+  document.body.classList.add('uten-bunntekst');
+  app.innerHTML = `
+    <main class="velkomst">
+      <div class="velkomst-landskap" aria-hidden="true"></div>
+      <section class="velkomst-innhold">
+        <h1>Klassespillet</h1>
+        <p class="velkomst-ingress">Good Behavior Game på tavla. Vel speletid, tre reglar, heile klassen saman.</p>
+        <button class="knapp knapp-hoved" id="videre">Start</button>
+        <p class="velkomst-fra">© Lærarliv 2026</p>
+      </section>
+    </main>`;
+  const bilde = lagLandskap(7, { brett: false });
+  bilde.setAttribute('preserveAspectRatio', 'xMidYMax slice');
+  app.querySelector('.velkomst-landskap').append(bilde);
+  app.querySelector('#videre').onclick = () => vis(hjem);
+  app.querySelector('#videre').focus();
+}
+
+function klasser() {
+  app.innerHTML = `
+    <main class="oppsett">
+      <div class="skjema">
+        <h1>Klassar</h1>
+        <ul class="klasse-liste">
+          ${tilstand.klasser.map((k) => `
+            <li><button class="klasse-valg${k === klasse() ? ' aktiv' : ''}" data-id="${k.id}">
+              <span class="klasse-navn">${esc(k.navn)}</span>
+              <span class="hjelp">${k.okter.length === 1 ? 'Éin økt' : `${k.okter.length} økter`} i loggen</span>
+            </button></li>`).join('')}
+        </ul>
+        <div class="hjem-knapper">
+          <button class="knapp knapp-stille" id="ny">Ny klasse</button>
+        </div>
+      </div>
+    </main>`;
+  app.querySelectorAll('.klasse-valg').forEach((b) => b.addEventListener('click', () => {
+    tilstand.aktivKlasseId = b.dataset.id;
+    lagre();
+    vis(hjem);
+  }));
+  app.querySelector('#ny').onclick = () => vis(() => oppsett({ ny: true }));
+  topplinje(hjem);
+  app.querySelector('.klasse-valg.aktiv').focus();
+}
+
+// Hjem-oppsettet med landskapet til høyre, brukt av skjermene før en økt.
+// Uten brett for skjermer med mye tekst, så feltene ikke kolliderer med den.
+function forHjem(innhold, { brett = true } = {}) {
+  const k = klasse();
+  app.innerHTML = `
+    <main class="hjem">
+      <div class="hjem-landskap" aria-hidden="true"></div>
+      <section class="hjem-innhold">${innhold}</section>
+    </main>`;
+  const bilde = lagLandskap(k?.innstillinger.maalfelt ?? 7, { brett });
+  bilde.setAttribute('preserveAspectRatio', 'xMaxYMid slice');
+  app.querySelector('.hjem-landskap').append(bilde);
+}
+
+const SJEKKPUNKTER = [
+  'Reglene er gjennomgått med eksempler.',
+  'Klassen vet hva som skal til for å vinne.',
+  'Listen med klassens val er klar.',
+  'Tidspunktet passer: ro etter friminutt, selvstendig arbeid eller tavleundervisning.',
+];
+
+// Valg av regelsett før en økt. Reglene vises under, så læreren kan gå gjennom dem.
+function regelsettVeler(k) {
+  const valgt = regelsettFor(k);
+  const regler = (rs) => rs.regler.map((r) => `<li>${esc(r.tekst)}</li>`).join('');
+  return `
+    <fieldset class="vel-regelsett">
+      <legend class="hjelp">Reglar for denne økta</legend>
+      ${k.regelsett.length > 1
+        ? `<div class="regelsett-valg">${k.regelsett.map((rs) => `
+            <label><input type="radio" name="regelsett" value="${rs.id}" ${rs === valgt ? 'checked' : ''} /><span>${esc(rs.navn)}</span></label>`).join('')}
+          </div>`
+        : `<input type="hidden" name="regelsett" value="${valgt.id}" /><p class="hjem-regelsett">${esc(valgt.navn)}</p>`}
+      <ol class="hjem-regler">${regler(valgt)}</ol>
+    </fieldset>`;
+}
+
+function kobleRegelsettVeler(form, k) {
+  const liste = form.querySelector('.vel-regelsett .hjem-regler');
+  form.querySelectorAll('[name=regelsett]').forEach((r) => r.addEventListener('change', () => {
+    const rs = k.regelsett.find((x) => x.id === r.value);
+    liste.innerHTML = rs.regler.map((x) => `<li>${esc(x.tekst)}</li>`).join('');
+  }));
+  return () => {
+    const rs = k.regelsett.find((x) => x.id === form.elements.regelsett.value) ?? k.regelsett[0];
+    k.sisteRegelsettId = rs.id;
+    return rs;
+  };
+}
+
+function sjekkliste() {
+  const k = klasse();
+  forHjem(`
+    <form class="sjekkliste">
+      <h1 class="sjekkliste-tittel">Klare?</h1>
+      ${regelsettVeler(k)}
+      <fieldset class="felt-gruppe">
+         <legend>Kor lenge skal de spele?</legend>
+         <label class="felt-rad"><span>Tal på minutt (1–20)</span>
+           <input type="number" name="valfriVarighet" min="1" max="20" step="1" value="10" required style="max-width:7rem;padding:.5rem;font-size:1.2rem"></label>
+         <p class="hjelp">Du kan velje ny speletid for kvar økt.</p>
+       </fieldset>
+       <fieldset>
+        <legend class="hjelp">Kryss av det som stemmer. Avkrysningen blir lagra i loggen, så du ser seinare kva økter som var godt førebudd.</legend>
+        ${SJEKKPUNKTER.map((t, i) => `
+          <label class="sjekkpunkt"><input type="checkbox" name="s${i}" /><span>${esc(t)}</span></label>`).join('')}
+      </fieldset>
+      <div class="hjem-knapper">
+        <button class="knapp knapp-hoved" type="submit">Start økt</button>
+        <button class="knapp knapp-stille" type="button" id="tilbake">Tilbake</button>
+      </div>
+    </form>`, { brett: false });
+  const form = app.querySelector('form');
+  const hentRegelsett = kobleRegelsettVeler(form, k);
+  form.onsubmit = (e) => {
+    e.preventDefault();
+    const alle = SJEKKPUNKTER.every((_, i) => form.elements[`s${i}`].checked);
+
+    const minutt = Math.max(1, Math.min(20, Number(form.elements.valfriVarighet.value) || 10));
+    const oekt = Okt.nyOkt(k, Date.now(), { sjekkliste: alle, regelsett: hentRegelsett() });
+    oekt.intervaller = minutt;
+    oekt.maalfelt = Math.min(oekt.maalfelt, minutt);
+    oekt.stjernekrav = Math.min(oekt.stjernekrav, minutt);
+    tilstand.pagaende = oekt;
+    lagre();
+    vis(spill);
+  };
+  form.querySelector('#tilbake').onclick = () => vis(hjem);
+  topplinje(hjem);
+  (form.querySelector('[name=regelsett]:checked') ?? form.querySelector('[name=s0]')).focus();
+}
+
+function kartleggingStart() {
+  const k = klasse();
+  const antall = k.okter.filter((o) => o.type === 'kartlegging').length;
+  forHjem(`
+    <form class="sjekkliste">
+      <h1 class="sjekkliste-tittel">Kartlegging</h1>
+      <p class="hjem-mal">Ti minutt vanleg undervisning, utan spel. Trykk på brot-knappen kvar gong nokon bryt ein regel.</p>
+      ${regelsettVeler(k)}
+      <p class="hjelp">Klassen ser bare landskapet, ikke brettet eller tellingen. Atferd som varer, teller som nytt brudd hvert 15. sekund.
+        Gjør tre til fem kartlegginger på ulike dager, så har du tall å vurdere i loggen.
+        ${antall ? `Du har gjort ${antall}.` : ''}</p>
+      <div class="hjem-knapper">
+        <button class="knapp knapp-hoved" type="submit">Start kartlegging</button>
+        <button class="knapp knapp-stille" type="button" id="tilbake">Tilbake</button>
+      </div>
+    </form>`, { brett: false });
+  const form = app.querySelector('form');
+  const hentRegelsett = kobleRegelsettVeler(form, k);
+  form.onsubmit = (e) => {
+    e.preventDefault();
+    tilstand.pagaende = Okt.nyOkt(k, Date.now(), { type: 'kartlegging', regelsett: hentRegelsett() });
+    lagre();
+    vis(spill);
+  };
+  form.querySelector('#tilbake').onclick = () => vis(hjem);
+  topplinje(hjem);
+  form.querySelector('[type=submit]').focus();
+}
+
+// Hva målfeltet betyr: brikken går bare i minutter helt uten brudd.
+const maalfeltHjelp = (felt, minutter) =>
+  `Klassen må ha ${felt} av ${minutter} minutter helt uten brudd. Et minutt med ett brudd teller like mye som et minutt med mange.`;
+const tallValg = (fra, til, valgt) => Array.from({ length: til - fra + 1 }, (_, i) => fra + i)
+  .map((n) => `<option ${n === valgt ? 'selected' : ''}>${n}</option>`).join('');
+
+// Oppsettet holder regelsettene i et utkast til læreren trykker Lagre.
+// Ferdige regelsett står alltid i lista og veles med en avkrysning.
+function oppsett({ ny = !klasse(), fokus = null } = {}) {
+  const k = ny ? nyKlasse() : klasse();
+  const inn = k.innstillinger;
+  const variant = k.variant ?? 'rolig';
+
+  let rader = [
+    ...BIBLIOTEK.map((b) => {
+      const eget = k.regelsett.find((r) => r.mal === b.mal);
+      return { mal: b.mal, valgt: Boolean(eget), sett: structuredClone(eget ?? fraBibliotek(b.mal)) };
+    }),
+    ...k.regelsett.filter((r) => !r.mal).map((r) => ({ mal: null, valgt: true, sett: structuredClone(r) })),
+  ];
+
+  app.innerHTML = `
+    <main class="oppsett">
+      <form class="skjema" novalidate>
+        <h1>${ny ? 'Set opp klassen' : 'Oppsett'}</h1>
+        <p class="skjema-ingress">Skriv aldri elevnamn her. Appen lagrar berre det som står på denne sidan, og berre på denne maskinen.
+</p>
+
+        <label class="felt-gruppe">
+          <span>Klassenamn</span>
+          <input name="navn" required maxlength="20" placeholder="For døme 9B" value="${esc(k.navn)}" autocomplete="off" />
+        </label>
+
+        <fieldset class="felt-gruppe">
+          <legend>Regelsett</legend>
+          <p class="hjelp">Vel situasjonene du vil spele i. Før kvar økt veler du hvilket regelsett som gjeld.
+            Kva som tel som brot, står berre her, ikkje på tavla. Åtferd som varer, blir registrert som nytt brot kvart 15. sekund.</p>
+          <div class="regelsett-liste"></div>
+          <div><button class="knapp knapp-stille" type="button" id="nytt-regelsett">Lag eige regelsett</button></div>
+        </fieldset>
+
+        <fieldset class="felt-gruppe">
+          <legend>Spillform</legend>
+          <p class="hjelp">Forskinga fann ingen tydeleg skilnad mellom spelformene. Vel den du klarer å gjennomføre.</p>
+          <div class="variant-liste">
+            <div class="regelsett-kort variant-kort">
+              <label class="avkrysning"><input type="radio" name="variant" value="rolig" ${variant === 'rolig' ? 'checked' : ''} />
+                <span><strong>Fjelltur</strong><span class="hjelp">Heile klassen er eitt lag. Brikken går eitt felt for kvart minutt utan brot. Lettest å gjennomføre åleine.</span></span></label>
+              <div class="variant-felt">
+                <label class="felt-rad"><span>Målfelt</span>
+                  <select name="maalfelt">${tallValg(1, 10, inn.maalfelt)}</select></label>
+                <p class="hjelp maalfelt-hjelp">${maalfeltHjelp(inn.maalfelt, inn.intervaller)}</p>
+              </div>
+            </div>
+            <div class="regelsett-kort variant-kort">
+              <label class="avkrysning"><input type="radio" name="variant" value="brudd" ${variant === 'brudd' ? 'checked' : ''} />
+                <span><strong>Skodde</strong><span class="hjelp">Heile klassen er eitt lag. Kvart brot tel, og ein sky driv inn over fjellet. Klassen ser teljinga og får ein felles påminnelse, «Hugs reglane», utan at nokon blir peika ut.</span></span></label>
+              <div class="variant-felt">
+                <label class="felt-rad"><span>Grense</span>
+                  <select name="bruddgrense">${tallValg(3, 20, inn.bruddgrense)}</select></label>
+                <p class="hjelp">Klassen vinn med færre brot enn grensa. I studiane var grensa 10.</p>
+              </div>
+            </div>
+            <div class="regelsett-kort variant-kort">
+              <label class="avkrysning"><input type="radio" name="variant" value="lag" ${variant === 'lag' ? 'checked' : ''} />
+                <span><strong>Stjernehimmel</strong><span class="hjelp">To eller tre lag. Kvart lag har sitt stjernebilete og får ein stjerne for kvart minutt utan brot. Krevjande åleine, fordi du må registrere brot på rett lag medan du underviser.</span></span></label>
+              <div class="variant-felt">
+                <div class="felt-rader">
+                  <label class="felt-rad"><span>Tal på lag</span>
+                    <select name="antallLag">${tallValg(2, 3, inn.antallLag)}</select></label>
+                  <label class="felt-rad"><span>Stjerner for å vinne</span>
+                    <select name="stjernekrav">${tallValg(5, 10, inn.stjernekrav)}</select></label>
+                </div>
+                <p class="hjelp">Heile klassen trekkjer klassens val når minst eitt lag når kravet.
+                  Del klassen etter kvar elevane sit. Appen lagrar ikkje kven som er på hvilket lag. To lag gir betre oversikt enn tre.</p>
+              </div>
+            </div>
+          </div>
+        </fieldset>
+
+        <div class="felt-gruppe">
+          <label for="klassens-valg"><span class="felt-navn">Klassens val, eitt per linje</span></label>
+          <textarea id="klassens-valg" name="klassensValg" rows="6">${esc(k.klassensValg.join('\n'))}</textarea>
+          <button type="button" class="knapp knapp-stille" id="stjerne-lodd">Bruk seks ferdige stjernelodd (5 × ⭐, 1 × ⭐⭐)</button>
+          <p class="hjelp">Bruk forslaga elevane har skrevet på lappar. Eit godt forslag er realistisk, tek rundt ti minutt og gjeld heile klassen.</p>
+          <details class="forslag">
+            <summary>Startliste du kan vele frå</summary>
+            <ul class="forslag-liste">
+              ${FORSLAG.map((f) => `<li><button type="button" class="forslag-knapp">${esc(f)}</button></li>`).join('')}
+            </ul>
+            <p class="hjelp">Sjekk skolens reglar for tilsyn før de går ut tidlig.
+              Unngå fritak frå lekser, prøver eller vurdering, mat og godteri, og alt som gir enkeltelever fordeler.</p>
+          </details>
+        </div>
+
+        <fieldset class="felt-gruppe">
+          <legend>Visning</legend>
+          <label class="avkrysning"><input type="checkbox" name="visTidtaker" ${inn.visTidtaker ? 'checked' : ''} /> Vis tida for elevane</label>
+          <label class="avkrysning"><input type="checkbox" name="animasjon" ${inn.animasjon ? 'checked' : ''} /> Animer brikka og sola</label>
+          <label class="avkrysning"><input type="checkbox" name="rospaaminnelse" ${inn.rospaaminnelse ? 'checked' : ''} /> Minn meg på å rose klassen</label>
+          <p class="hjelp">Kvart andre minutt står det ein liten, dempet setning ved knappane dine, med ros ut frå reglane. Sei den berre når den stemmer.</p>
+        </fieldset>
+
+        <p class="skjema-feil" role="alert" hidden></p>
+        <div class="hjem-knapper">
+          <button class="knapp knapp-hoved" type="submit">Lagre</button>
+          <button class="knapp knapp-stille" type="button" id="avbryt">Avbryt</button>
+        </div>
+        ${ny ? '' : `
+          <div class="slett-klasse">
+            <button class="lenke" type="button" id="slett">Slett ${esc(k.navn)}</button>
+            <p class="hjelp">Sletter klassen, regelsettene og heile loggen på denne maskinen.</p>
+          </div>`}
+      </form>
+      <dialog class="dialog" id="bekreft-slett">
+        <p>Slette ${esc(k.navn)} og hele loggen? Dette kan ikke angres. Last ned CSV fra loggen først om du vil ta vare på tallene.</p>
+        <form method="dialog" class="hjem-knapper">
+          <button class="knapp knapp-hoved" value="ja">Slett klassen</button>
+          <button class="knapp knapp-stille" value="nei" autofocus>Behold</button>
+        </form>
+      </dialog>
+    </main>`;
+
+  const form = app.querySelector('form');
+  const liste = form.querySelector('.regelsett-liste');
+
+  function tegnRegelsett(apne = -1) {
+    liste.innerHTML = rader.map((r, i) => {
+      const b = BIBLIOTEK.find((x) => x.mal === r.mal);
+      const plasser = Array.from({ length: MAKS_REGLER }, (_, j) => r.sett.regler[j] ?? { tekst: '', brudd: '' });
+      return `
+        <div class="regelsett-kort${r.valgt ? ' valgt' : ''}">
+          <div class="regelsett-hode">
+            ${b
+              ? `<label class="avkrysning"><input type="checkbox" data-bruk="${i}" ${r.valgt ? 'checked' : ''} />
+                  <span><strong>${esc(b.navn)}</strong><span class="hjelp">${esc(b.om)}</span></span></label>`
+              : `<input data-navn="${i}" value="${esc(r.sett.navn)}" placeholder="Navn, for døme Lab-arbeid" aria-label="Navn på eige regelsett" maxlength="40" />
+                 <button class="lenke" type="button" data-fjern="${i}">Fjern</button>`}
+          </div>
+          <details ${i === apne ? 'open' : ''}>
+            <summary>Reglar og kva som tel som brot</summary>
+            ${b?.merknad ? `<p class="hjelp regelsett-merknad">${esc(b.merknad)}</p>` : ''}
+            <ol class="regel-liste">
+              ${plasser.map((p, j) => `
+                <li>
+                  <label class="regel-felt"><span>Regel</span>
+                    <textarea data-regel="${i}.${j}" rows="1" aria-label="Regel ${j + 1}"
+                      placeholder="${j === 3 ? 'Fjerde regel, valgfri' : 'Skriv det elevene skal gjøre'}">${esc(p.tekst)}</textarea></label>
+                  <label class="regel-felt brot-felt"><span>Brot</span>
+                    <textarea data-brudd="${i}.${j}" rows="1" aria-label="Hva som teller som brudd på regel ${j + 1}"
+                      placeholder="Det du registrerer">${esc(p.brudd)}</textarea></label>
+                </li>`).join('')}
+            </ol>
+          </details>
+        </div>`;
+    }).join('');
+  }
+
+  // Leser det som står i feltene tilbake til utkastet, før lista tegnes på nytt eller lagres.
+  function lesRegelsett() {
+    rader = rader.map((r, i) => ({
+      ...r,
+      valgt: r.mal ? liste.querySelector(`[data-bruk="${i}"]`).checked : true,
+      sett: {
+        ...r.sett,
+        navn: r.mal ? r.sett.navn : liste.querySelector(`[data-navn="${i}"]`).value.trim(),
+        regler: Array.from({ length: MAKS_REGLER }, (_, j) => ({
+          tekst: liste.querySelector(`[data-regel="${i}.${j}"]`).value.trim(),
+          brudd: liste.querySelector(`[data-brudd="${i}.${j}"]`).value.trim(),
+        })).filter((x) => x.tekst || x.brudd),
+      },
+    }));
+  }
+
+  tegnRegelsett();
+  // Feltene vokser med teksten, men en regel og et brudd er én linje hver.
+  liste.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target.matches('textarea')) e.preventDefault();
+  });
+  liste.addEventListener('change', (e) => {
+    if (e.target.dataset.bruk) e.target.closest('.regelsett-kort').classList.toggle('valgt', e.target.checked);
+  });
+  liste.addEventListener('click', (e) => {
+    const i = e.target.dataset.fjern;
+    if (i === undefined) return;
+    lesRegelsett();
+    rader.splice(Number(i), 1);
+    tegnRegelsett();
+    form.querySelector('#nytt-regelsett').focus();
+  });
+  form.querySelector('#nytt-regelsett').onclick = () => {
+    lesRegelsett();
+    rader.push({ mal: null, valgt: true, sett: egetRegelsett() });
+    tegnRegelsett(rader.length - 1);
+    liste.querySelector(`[data-navn="${rader.length - 1}"]`).focus();
+  };
+
+  const valgFelt = form.elements.klassensValg;
+  const merkForslag = () => {
+    const linjer = valgFelt.value.split('\n').map((s) => s.trim());
+    form.querySelectorAll('.forslag-knapp').forEach((b) => { b.disabled = linjer.includes(b.textContent); });
+  };
+  merkForslag();
+  valgFelt.addEventListener('input', merkForslag);
+  form.elements.maalfelt.addEventListener('change', (e) => {
+    form.querySelector('.maalfelt-hjelp').textContent = maalfeltHjelp(Number(e.target.value), inn.intervaller);
+  });
+  form.querySelector('#stjerne-lodd').addEventListener('click', () => {
+    valgFelt.value = FORSLAG.join('\n');
+    valgFelt.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  form.querySelector('.forslag-liste').addEventListener('click', (e) => {
+    const b = e.target.closest('.forslag-knapp');
+    if (!b) return;
+    valgFelt.value = `${valgFelt.value.trimEnd()}${valgFelt.value.trim() ? '\n' : ''}${b.textContent}`;
+    merkForslag();
+  });
+
+  // Endringer i feltene eller regelsettene gjør at Tilbake spør før de forkastes.
+  let endret = false;
+  form.addEventListener('input', () => { endret = true; });
+  form.addEventListener('change', () => { endret = true; });
+  form.addEventListener('click', (e) => { if (e.target.closest('#nytt-regelsett, [data-fjern], .forslag-knapp')) endret = true; });
+  forlat = (videre) => (endret ? bekreftForlat(videre) : videre());
+  topplinje(hjem);
+  form.querySelector('#avbryt').addEventListener('click', () => forlat(() => vis(hjem)));
+  const slett = app.querySelector('#bekreft-slett');
+  form.querySelector('#slett')?.addEventListener('click', () => slett.showModal());
+  slett.addEventListener('close', () => {
+    if (slett.returnValue !== 'ja') return;
+    tilstand.klasser = tilstand.klasser.filter((x) => x !== k);
+    tilstand.aktivKlasseId = tilstand.klasser[0]?.id ?? null;
+    lagre();
+    vis(hjem);
+  });
+  form.onsubmit = (e) => {
+    e.preventDefault();
+    lesRegelsett();
+    const f = new FormData(form);
+    const navn = f.get('navn').trim();
+    const valgte = rader.filter((r) => r.valgt);
+    const feil = form.querySelector('.skjema-feil');
+    const visFeil = (tekst, felt) => {
+      feil.textContent = tekst;
+      feil.hidden = false;
+      felt.closest('details')?.setAttribute('open', '');
+      felt.focus();
+    };
+
+    if (!navn) return visFeil('Klassen trenger et navn.', form.elements.navn);
+    if (!valgte.length) return visFeil('Vel minst ett regelsett.', liste.querySelector('[data-bruk]'));
+    for (const r of valgte) {
+      const i = rader.indexOf(r);
+      if (!r.sett.navn) return visFeil('Gi det egne regelsettet et navn.', liste.querySelector(`[data-navn="${i}"]`));
+      const tomme = r.sett.regler.findIndex((x) => !x.tekst);
+      if (r.sett.regler.filter((x) => x.tekst).length < 3 || tomme !== -1) {
+        tegnRegelsett(i);
+        const j = tomme !== -1 ? tomme : r.sett.regler.length;
+        return visFeil(`${r.sett.navn} trenger tre regler. En fjerde er valgfri.`, liste.querySelector(`[data-regel="${i}.${Math.min(j, 3)}"]`));
+      }
+    }
+
+    k.navn = navn;
+    k.regelsett = valgte.map((r) => r.sett);
+    const valg = f.get('klassensValg').split('\n').map((s) => s.trim()).filter(Boolean);
+    if (valg.length && valg.join() !== k.klassensValg.join()) {
+      k.sisteBelonningskartlegging = new Date().toISOString().slice(0, 10);
+    }
+    k.klassensValg = valg;
+    k.variant = f.get('variant');
+    inn.maalfelt = Number(f.get('maalfelt'));
+    inn.bruddgrense = Number(f.get('bruddgrense'));
+    inn.antallLag = Number(f.get('antallLag'));
+    inn.stjernekrav = Number(f.get('stjernekrav'));
+    inn.visTidtaker = f.has('visTidtaker');
+    inn.animasjon = f.has('animasjon');
+    inn.rospaaminnelse = f.has('rospaaminnelse');
+    if (ny) tilstand.klasser.push(k);
+    tilstand.aktivKlasseId = k.id;
+    lagre();
+    vis(hjem);
+  };
+  const start = fokus ? form.elements[fokus] : form.elements.navn;
+  start.focus();
+  if (fokus) start.scrollIntoView({ block: 'center' });
+}
+
+// ---------- Spill ----------
+
+function klokke(ms) {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+const LAGTASTER = [[' ', 'ArrowDown', 'PageDown', '1'], ['ArrowUp', 'PageUp', '2'], ['3']];
+const ROS_START = 30_000;
+const ROS_HVERT = 120_000;
+const ROS_VARER = 12_000;
+const PAMINNELSE_VARER = 3500;
+
+// Tellingen på bruddbrettet og regelen for lagspillet. Skyene og
+// stjernebildene i landskapet viser resten.
+function maaler(okt) {
+  if (okt.variant === 'brudd') {
+    return `
+      <section class="maaler maaler-brot" aria-label="Brudd">
+        <p class="maaler-tall"><span class="maaler-n">0</span> brot</p>
+        <ol class="brudd-rekke" aria-hidden="true">${Array.from({ length: okt.bruddgrense }, (_, i) =>
+          `<li class="${i === okt.bruddgrense - 1 ? 'grense' : ''}"></li>`).join('')}<li class="over" hidden></li></ol>
+        <p class="maaler-tekst">Under ${okt.bruddgrense} brudd, så trekkjer de klassens val.</p>
+        <p class="paminnelse" aria-live="polite">Hugs reglane</p>
+      </section>`;
+  }
+  return `
+    <section class="maaler maaler-lag">
+      <p class="maaler-tekst">Minst ett lag med ${okt.stjernekrav} stjerner, så trekkjer heile klassen klassens val.</p>
+    </section>`;
+}
+
+function spill() {
+  let okt = tilstand.pagaende;
+  const k = tilstand.klasser.find((x) => x.id === okt.klasseId) ?? klasse();
+  const kartlegging = okt.type === 'kartlegging';
+  // Økter startet før spillformene fantes, er rolig brett.
+  const variant = kartlegging ? null : (okt.variant ?? 'rolig');
+  const lag = Okt.antallLag(okt);
+  // Økter startet før versjon 2 har ikke regelsettet med seg.
+  const rs = okt.regelsett ?? (({ navn, regler }) => ({ navn, regler: regler.map((r) => r.tekst) }))(regelsettFor(k));
+  const ros = k.innstillinger.rospaaminnelse && !kartlegging;
+  // Brettet trenger hele skjermen, så bunnteksten skjules under økta.
+  document.body.classList.add('uten-bunntekst');
+
+  app.innerHTML = `
+    <main class="spill${kartlegging ? ' spill-kartlegging' : ` spill-${variant}`}">
+      <div class="brett">
+        <header class="brett-topp">
+          <h1 class="brett-klasse">${esc(k.navn)}</h1>
+          <p class="brett-tid" ${k.innstillinger.visTidtaker || kartlegging ? '' : 'hidden'} aria-live="off"></p>
+        </header>
+        ${variant === 'brudd' || variant === 'lag' ? maaler(okt) : ''}
+        <div class="nedtelling" aria-live="assertive"></div>
+        <div class="pause-lag" hidden><p>Pause</p></div>
+        <section class="resultat" hidden aria-live="polite"></section>
+        <aside class="styring" aria-label="Lærarens knapper">
+          ${ros ? '<p class="ros" hidden></p>' : ''}
+          <span class="markering" aria-hidden="true"></span>
+          ${lag > 1
+            ? Array.from({ length: lag }, (_, l) => `
+              <button class="knapp-brudd" data-lag="${l}" title="${['Mellomrom, pil ned eller 1', 'Pil opp eller 2', '3'][l]}">Brot lag ${l + 1}</button>`).join('')
+            : '<button class="knapp-brudd" data-lag="0" title="Mellomrom, pil ned eller Page Down">Brot</button>'}
+          <button class="knapp-liten" id="pause" title="P">Pause</button>
+          <button class="knapp-liten" id="fullskjerm" title="F" hidden>Fullskjerm</button>
+          <button class="knapp-liten" id="avslutt" title="Esc">Avslutt</button>
+        </aside>
+      </div>
+      ${kartlegging ? '' : `
+        <footer class="regler">
+          <p class="regler-navn">${esc(rs.navn)}</p>
+          <ol style="--antall: ${rs.regler.length}">${rs.regler.map((r) => `<li>${esc(r)}</li>`).join('')}</ol>
+        </footer>`}
+      <dialog class="dialog" id="bekreft">
+        <p>Avslutte ${kartlegging ? 'kartleggingen' : 'økten'} nå? Den blir ikke lagret i loggen.</p>
+        <form method="dialog" class="hjem-knapper">
+          <button class="knapp knapp-hoved" value="ja">Avslutt ${kartlegging ? 'kartleggingen' : 'økten'}</button>
+          <button class="knapp knapp-stille" value="nei" autofocus>Hald fram</button>
+        </form>
+      </dialog>
+    </main>`;
+
+  const brett = app.querySelector('.brett');
+  const svg = lagLandskap(okt.maalfelt, {
+    brett: variant === 'rolig',
+    skyer: variant === 'brudd' ? okt.bruddgrense : 0,
+    lag: variant === 'lag' ? lag : 0,
+    intervaller: okt.intervaller,
+  });
+  brett.prepend(svg);
+  const brikke = svg.querySelector('.brikke');
+  const rosEl = app.querySelector('.ros');
+  const paminnelse = app.querySelector('.paminnelse');
+  const sol = svg.querySelector('.sol');
+  const tidEl = app.querySelector('.brett-tid');
+  const nedtelling = app.querySelector('.nedtelling');
+  const markering = app.querySelector('.markering');
+  const pauseLag = app.querySelector('.pause-lag');
+  const bekreft = app.querySelector('#bekreft');
+
+  let vistFelt = null;
+  let flytting = null;
+  let ferdigVist = false;
+
+  function oppdater(o) {
+    okt = o;
+    tilstand.pagaende = o;
+    lagre();
+    tegn();
+  }
+
+  function settBrikke(felt) {
+    const [x, y] = punkt(felt);
+    brikke.setAttribute('transform', `translate(${x} ${y})`);
+  }
+
+  function gaaTil(felt) {
+    svg.querySelectorAll('.sti-gatt').forEach((s) =>
+      s.classList.toggle('gatt', Number(s.dataset.segment) < felt));
+    svg.querySelectorAll('.felt').forEach((f) =>
+      f.classList.toggle('naadd', Number(f.dataset.felt) <= felt));
+
+    if (vistFelt === null || felt <= vistFelt || redusertBevegelse()) {
+      cancelAnimationFrame(flytting);
+      settBrikke(felt);
+    } else {
+      // Rolig gange langs stisegmentet fra forrige felt.
+      const seg = svg.querySelector(`[data-segment="${felt - 1}"]`);
+      const lengde = seg.getTotalLength();
+      const t0 = performance.now();
+      const varighet = 2200;
+      cancelAnimationFrame(flytting);
+      const steg = (naa) => {
+        const u = Math.min(1, (naa - t0) / varighet);
+        const e = u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2;
+        const p = seg.getPointAtLength(e * lengde);
+        brikke.setAttribute('transform', `translate(${p.x} ${p.y})`);
+        if (u < 1) flytting = requestAnimationFrame(steg);
+      };
+      flytting = requestAnimationFrame(steg);
+    }
+    vistFelt = felt;
+  }
+
+  function tegn() {
+    const naa = Date.now();
+    const t = Okt.spilltid(okt, naa);
+    const varighet = Okt.varighetMs(okt);
+    const andel = Math.max(0, Math.min(1, t / varighet));
+
+    nedtelling.textContent = t < 0 ? Math.ceil(-t / 1000) : '';
+    nedtelling.hidden = t >= 0;
+    tidEl.textContent = klokke(varighet - Math.max(0, t));
+
+    // Sola vandrer over himmelen, og lyset går mot kveld. På bruddbrettet går
+    // den lavere, under tellingen. I lagspillet står månen stille, og
+    // stjernebildene viser tiden.
+    const solAndel = k.innstillinger.visTidtaker && !kartlegging ? andel : 0.18;
+    const [solTopp, solHoyde] = variant === 'brudd' ? [400, 170] : [330, 220];
+    sol.setAttribute('transform', variant === 'lag' ? 'translate(1490 250) scale(0.8)'
+      : `translate(${220 + solAndel * 1160} ${solTopp - Math.sin(Math.PI * (0.12 + solAndel * 0.76)) * solHoyde})`);
+    svg.style.setProperty('--kveld-styrke', k.innstillinger.visTidtaker && !kartlegging ? andel : 0);
+
+    if (variant === 'rolig') {
+      const felt = Math.min(10, Okt.posisjon(okt, naa));
+      if (felt !== vistFelt) gaaTil(felt);
+    } else if (variant === 'brudd') {
+      tegnBrudd(t);
+    } else if (variant === 'lag') {
+      tegnLag(naa);
+    }
+
+    const prikker = (n) => '•'.repeat(Math.min(n, 5)) + (n > 5 ? '+' : '');
+    if (kartlegging) {
+      markering.textContent = okt.brudd.length || '';
+    } else if (lag > 1) {
+      markering.textContent = Array.from({ length: lag }, (_, l) => prikker(Okt.bruddIGjeldendeIntervall(okt, naa, l)) || '·').join(' | ');
+    } else {
+      markering.textContent = prikker(Okt.bruddIGjeldendeIntervall(okt, naa));
+    }
+
+    if (rosEl) {
+      const vis = okt.pauseFra === null && t >= ROS_START && t < varighet && (t - ROS_START) % ROS_HVERT < ROS_VARER;
+      if (vis && rosEl.hidden) {
+        const regel = rs.regler[Math.floor((t - ROS_START) / ROS_HVERT) % rs.regler.length];
+        rosEl.innerHTML = `<span class="ros-merke">Ros</span> «${esc(rosForslag(regel))}»`;
+      }
+      rosEl.hidden = !vis;
+    }
+
+    pauseLag.hidden = okt.pauseFra === null;
+    app.querySelector('#pause').textContent = okt.pauseFra === null ? 'Pause' : 'Hald fram';
+
+    if (Okt.erFerdig(okt, naa) && !ferdigVist) {
+      ferdigVist = true;
+      if (rosEl) rosEl.hidden = true;
+      if (kartlegging) visKartleggingFerdig();
+      else setTimeout(visResultat, redusertBevegelse() || variant !== 'rolig' ? 0 : 2600);
+    }
+  }
+
+  function tegnBrudd(t) {
+    const n = okt.brudd.length;
+    const grense = okt.bruddgrense;
+    app.querySelector('.maaler-n').textContent = n;
+    app.querySelectorAll('.brudd-rekke li:not(.over)').forEach((li, i) => li.classList.toggle('brukt', i < n));
+    const over = app.querySelector('.brudd-rekke .over');
+    over.hidden = n <= grense;
+    over.textContent = `+${n - grense}`;
+    svg.querySelectorAll('.sky').forEach((sky, i) => sky.classList.toggle('kommet', i < n));
+    svg.style.setProperty('--skyandel', Math.min(1, n / grense));
+    // Påminnelsen står en kort stund etter hvert brudd. Den regnes ut fra klokka, som resten av spillet.
+    const siste = okt.brudd.at(-1);
+    const tSiste = typeof siste === 'number' ? siste : siste?.t;
+    paminnelse.classList.toggle('synlig', siste !== undefined && t - tSiste < PAMINNELSE_VARER && !Okt.erFerdig(okt));
+  }
+
+  function tegnLag(naa) {
+    const fullfort = Okt.fullforteIntervaller(okt, naa);
+    const t = Okt.spilltid(okt, naa);
+    const naavaerende = t >= 0 && !Okt.erFerdig(okt, naa) ? Okt.intervallFor(okt, t) : -1;
+    svg.querySelectorAll('.stjernebilde').forEach((bilde) => {
+      const l = Number(bilde.dataset.lag);
+      const telling = Okt.bruddPerIntervall(okt, l);
+      const stjerner = Okt.posisjon(okt, naa, l);
+      const fikk = (i) => i < fullfort && !telling[i];
+      bilde.querySelectorAll('.bilde-punkt').forEach((p, i) => {
+        p.setAttribute('class', `bilde-punkt ${fikk(i) ? 'fikk' : telling[i] && i <= Math.max(fullfort - 1, naavaerende) ? 'tapt' : i === naavaerende ? 'naa' : 'kommer'}`);
+      });
+      bilde.querySelectorAll('.bilde-linje').forEach((linje) =>
+        linje.classList.toggle('tent', fikk(Number(linje.dataset.a)) && fikk(Number(linje.dataset.b))));
+      const vunnet = stjerner >= okt.stjernekrav;
+      bilde.classList.toggle('vunnet', vunnet);
+      bilde.querySelector('.bilde-navn').textContent = `Lag ${l + 1}${vunnet ? ' ✓' : ''}`;
+      bilde.querySelector('.lag-tall').textContent = vunnet ? `${stjerner} stjerner` : `${stjerner} av ${okt.stjernekrav}`;
+    });
+  }
+
+  function visKartleggingFerdig() {
+    const panel = app.querySelector('.resultat');
+    app.querySelector('.styring').hidden = true;
+    panel.hidden = false;
+    const n = okt.brudd.length;
+    panel.innerHTML = `
+      <h2>Kartlegging ferdig</h2>
+      <p>${n === 1 ? 'Eitt brot' : `${n} brudd`} på ti minutter.</p>
+      <button class="knapp knapp-hoved" id="ferdig">Se loggen</button>`;
+    const knapp = panel.querySelector('#ferdig');
+    knapp.onclick = () => {
+      k.okter.push(Okt.tilLoggpost(okt));
+      tilstand.pagaende = null;
+      lagre();
+      vis(logg);
+    };
+    knapp.focus();
+  }
+
+  function ikkeNaadd() {
+    if (variant === 'brudd') return `Dere hadde ${okt.brudd.length} brudd. Grensen var ${okt.bruddgrense}.`;
+    if (variant === 'lag') {
+      const s = Array.from({ length: lag }, (_, l) => `lag ${l + 1} fikk ${Okt.posisjon(okt, Infinity, l)}`);
+      return `Det trengs ${okt.stjernekrav} stjerner. ${s.join(', ').replace(/^l/, 'L').replace(/, ([^,]*)$/, ' og $1')}.`;
+    }
+    return `Brikken kom til felt ${Okt.posisjon(okt)}.`;
+  }
+
+  function visResultat() {
+    const panel = app.querySelector('.resultat');
+    const naadd = Okt.maalNaadd(okt);
+    app.querySelector('.styring').hidden = true;
+    app.querySelector('.spill').classList.add('ferdig');
+    panel.hidden = false;
+
+    const avslutt = (valg) => {
+      k.okter.push(Okt.tilLoggpost(okt, valg));
+      tilstand.pagaende = null;
+      lagre();
+      vis(hjem);
+    };
+
+    if (!naadd || k.klassensValg.length === 0) {
+      panel.innerHTML = `
+        <h2>${naadd ? 'De har fortent klassens val' : 'Me prøver igjen neste gong'}</h2>
+        <p>${naadd ? 'Lista med klassens val er tom. Legg henne inn i oppsettet.' : ikkeNaadd()}</p>
+        <button class="knapp knapp-hoved" id="ferdig">Ferdig</button>`;
+      panel.querySelector('#ferdig').onclick = () => avslutt(null);
+      panel.querySelector('#ferdig').focus();
+      return;
+    }
+
+    panel.innerHTML = `
+      <h2>De har fortent klassens val</h2>
+      <div class="trommel" aria-live="polite"><span class="trommel-tekst">?</span></div>
+      <button class="knapp knapp-hoved" id="trekk">Trekk</button>`;
+    const knapp = panel.querySelector('#trekk');
+    const tekst = panel.querySelector('.trommel-tekst');
+    knapp.focus();
+    knapp.onclick = () => {
+      knapp.disabled = true;
+      const liste = k.klassensValg;
+      const valgt = liste[Math.floor(Math.random() * liste.length)];
+      const ferdig = () => {
+        tekst.textContent = valgt;
+        panel.classList.add('trukket');
+        knapp.textContent = 'Ferdig';
+        knapp.disabled = false;
+        knapp.onclick = () => avslutt(valgt);
+        knapp.focus();
+      };
+      if (redusertBevegelse() || liste.length === 1) return ferdig();
+      // Lista ruller og bremser rolig ned før den stopper på valget.
+      const steg = 16;
+      let i = Math.floor(Math.random() * liste.length);
+      let vent = 90;
+      const rull = (igjen) => {
+        if (igjen === 0) return ferdig();
+        tekst.textContent = liste[i++ % liste.length];
+        tekst.animate([{ transform: 'translateY(-40%)', opacity: 0 }, { transform: 'none', opacity: 1 }],
+          { duration: Math.min(vent, 320), easing: 'ease-out' });
+        vent *= 1.17;
+        setTimeout(() => rull(igjen - 1), vent);
+      };
+      rull(steg);
+    };
+  }
+
+  function veksle() {
+    if (Okt.erFerdig(okt)) return;
+    oppdater(okt.pauseFra === null ? Okt.pause(okt) : Okt.fortsett(okt));
+  }
+
+  function spor() {
+    if (bekreft.open) return;
+    if (okt.pauseFra === null) oppdater(Okt.pause(okt));
+    bekreft.showModal();
+  }
+
+  bekreft.addEventListener('close', () => {
+    if (bekreft.returnValue === 'ja') {
+      tilstand.pagaende = null;
+      lagre();
+      vis(hjem);
+    } else if (okt.pauseFra !== null) {
+      oppdater(Okt.fortsett(okt));
+    }
+  });
+  // Esc lukker dialogen uten valg; da fortsetter spillet.
+  bekreft.addEventListener('cancel', () => { bekreft.returnValue = 'nei'; });
+
+  app.querySelectorAll('.knapp-brudd').forEach((b) => {
+    b.onclick = () => { oppdater(Okt.registrerBrudd(okt, Date.now(), Number(b.dataset.lag))); b.blur(); };
+  });
+  app.querySelector('#pause').onclick = (e) => { veksle(); e.currentTarget.blur(); };
+
+  // Fullskjerm skjuler nettleserens menyer, så brettet fyller tavla.
+  const hel = app.querySelector('#fullskjerm');
+  const vekslHel = () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {});
+  const visHel = () => { hel.textContent = document.fullscreenElement ? 'Lukk fullskjerm' : 'Fullskjerm'; };
+  hel.hidden = !document.fullscreenEnabled;
+  hel.onclick = (e) => { vekslHel(); e.currentTarget.blur(); };
+  document.addEventListener('fullscreenchange', visHel);
+  visHel();
+  app.querySelector('#avslutt').onclick = spor;
+
+  const taster = (e) => {
+    if (bekreft.open || !app.querySelector('.resultat').hidden) return;
+    const l = LAGTASTER.findIndex((t) => t.includes(e.key));
+    if (l !== -1 && (l < lag || ['ArrowUp', 'PageUp'].includes(e.key))) {
+      e.preventDefault(); // fjernkontrollen skal ikke rulle siden
+      if (l < lag) oppdater(Okt.registrerBrudd(okt, Date.now(), l));
+    } else if (e.key === 'p' || e.key === 'P') {
+      veksle();
+    } else if ((e.key === 'f' || e.key === 'F') && document.fullscreenEnabled) {
+      vekslHel();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      spor();
+    } else if (['ArrowUp', 'PageUp', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+      e.preventDefault(); // fjernkontrollen skal ikke rulle siden
+    }
+  };
+  document.addEventListener('keydown', taster);
+
+  // Hold skjermen våken under økten der nettleseren støtter det.
+  let vaaken = null;
+  const hold = () => navigator.wakeLock?.request('screen').then((l) => { vaaken = l; }).catch(() => {});
+  hold();
+  const synlig = () => { if (!document.hidden) { hold(); tegn(); } };
+  document.addEventListener('visibilitychange', synlig);
+
+  const tikk = setInterval(tegn, 250);
+  tegn();
+
+  stopp = () => {
+    clearInterval(tikk);
+    cancelAnimationFrame(flytting);
+    document.removeEventListener('keydown', taster);
+    document.removeEventListener('visibilitychange', synlig);
+    document.removeEventListener('fullscreenchange', visHel);
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    vaaken?.release().catch(() => {});
+  };
+}
+
+// ---------- Veiledning ----------
+
+function veiledningSide(tilbake) {
+  app.innerHTML = veiledning(klasse());
+  topplinje(tilbake);
+  app.querySelector('#vis-opplaering').onclick = opplaering;
+  app.querySelector('#til-elev').onclick = tilElev;
+  stopp = lagSpiller(app.querySelector('.anim-plass'), { redusert: redusertBevegelse() });
+  // Lenkene i innholdslista ruller innenfor siden uten å endre adressen.
+  app.querySelector('.veil-innhold').addEventListener('click', (e) => {
+    const a = e.target.closest('a');
+    if (!a) return;
+    e.preventDefault();
+    const maal = app.querySelector(a.getAttribute('href'));
+    maal.scrollIntoView({ behavior: redusertBevegelse() ? 'auto' : 'smooth' });
+    maal.querySelector('h2').focus({ preventScroll: true });
+  });
+  app.querySelectorAll('.veil-tekst h2').forEach((h) => { h.tabIndex = -1; });
+  window.scrollTo(0, 0);
+  app.querySelector('#topp-tilbake').focus();
+}
+
+function elevSide(tilbake) {
+  app.innerHTML = elevveiledning();
+  topplinje(tilbake);
+  const hel = app.querySelector('#fullskjerm');
+  if (!document.fullscreenEnabled) hel.hidden = true;
+  hel.onclick = () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen());
+  stopp = lagSpiller(app.querySelector('.anim-plass'), { redusert: redusertBevegelse() });
+  window.scrollTo(0, 0);
+  app.querySelector('#topp-tilbake').focus();
+}
+
+// ---------- Logg ----------
+
+function lastNed(navn, innhold) {
+  const url = URL.createObjectURL(new Blob([innhold], { type: 'text/csv;charset=utf-8' }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: navn });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+const TABELLDATO = new Intl.DateTimeFormat('nb-NO', { weekday: 'short', day: 'numeric', month: 'short' });
+const tall = (n) => n.toLocaleString('nb-NO', { maximumFractionDigits: 1 });
+
+function kartleggingsvurdering(okter) {
+  const antall = okter.filter((o) => o.type === 'kartlegging').length;
+  const o = Logg.kartleggingsoppsummering(okter);
+  if (!antall) return '';
+  if (!o) {
+    return `
+      <section class="vurdering">
+        <h2>Kartlegging</h2>
+        <p>Du har gjort ${antall} av minst ${Logg.KARTLEGGINGER_FOR_VURDERING} kartlegginger. Gjør resten på ulike dager før du vurderer om klassen trenger spillet.</p>
+      </section>`;
+  }
+  return `
+    <section class="vurdering">
+      <h2>Trenger klassen spelet?</h2>
+      <dl class="vurdering-tall">
+        <div><dt>Snitt</dt><dd>${tall(o.snitt)}</dd></div>
+        <div><dt>Lavest</dt><dd>${o.lavest}</dd></div>
+        <div><dt>Høyest</dt><dd>${o.hoyest}</dd></div>
+      </dl>
+      <p class="hjelp">Brot per kartlegging, de ${o.antall} siste.</p>
+      <p>I studiane lå klassane som fikk tiltaket på 39 til 142 brot per ti minutt før spelet, og stort sett på 0 til 21 under spelet.
+        Tallene vart registrert av trenede observatører i barneskoleklasser. De er ikkje ein grense for når ein klasse treng spelet.
+        Se på om tala dine er stabile over fleire målinger, og vurder sjølv.</p>
+      <p>Eit lavt og stabilt nivå tyder på at klassen ikkje treng spelet. Spelar de, viser diagrammet om brota går ned.</p>
+      <details class="forbehold">
+        <summary>Forbehold og kilder</summary>
+        <ul>
+          <li>Observatørene i studiane var trent i to veker, satt bakerst og underviste ikkje. Ein lærar som underviser samstundes, registrerer trolig færre brot enn det som faktisk skjer.</li>
+          <li>Tallene kan berre sammenlignes når brot defineres og blir registrert likt, mellom anna med nytt brot kvart 15. sekund når atferden varer.</li>
+          <li>Alle klassane gjekk på barnetrinnet, og spelet vart ledet av studenter, ikkje lærarar.</li>
+          <li>Grunnlaget er fire klassar.</li>
+          <li>Stabilitet og trend betyr like mykje som nivået. Forskerne utelot òg klassar der tala steg eller svinget mykje.</li>
+        </ul>
+        <p class="hjelp">Stangjordet, Isaksen og Strømgren (2026) og Isaksen mfl. (2026), Norsk Tidsskrift for Atferdsanalyse 53, s. 31–57.</p>
+      </details>
+    </section>`;
+}
+
+function logg() {
+  const k = klasse();
+  const okter = Logg.sortert(k.okter);
+  const jaNei = (v) => (v === true ? 'Ja' : v === false ? 'Nei' : '');
+
+  app.innerHTML = `
+    <main class="logg">
+      <header class="logg-topp">
+        <h1>Logg for ${esc(k.navn)}</h1>
+        <div class="hjem-knapper">
+          ${okter.length ? '<button class="knapp knapp-stille" id="csv">Last ned CSV</button>' : ''}
+        </div>
+      </header>
+      ${okter.length === 0 ? `
+        <section class="logg-tom">
+          <p>Ingen økter enno. Loggen fylles når du fullfører ein økt eller ein kartlegging.</p>
+          <div class="hjem-knapper">
+            <button class="knapp knapp-stille" id="kartlegg">Kartlegg klassen</button>
+          </div>
+        </section>` : `
+        ${kartleggingsvurdering(okter)}
+        <section class="logg-diagram">
+          <h2>Brot per økt</h2>
+          <div class="diagram"></div>
+        </section>
+        <section class="logg-tabell">
+          <h2>Alle økter</h2>
+          <div class="tabell-rull">
+            <table>
+              <thead><tr><th scope="col">Dato</th><th scope="col">Type</th><th scope="col" class="tall">Brot</th>
+                <th scope="col" class="tall">Minutt med brot</th><th scope="col">Mål nådd</th><th scope="col">Sjekkliste</th><th scope="col">Klassens val</th></tr></thead>
+              <tbody>${[...okter].reverse().map((o) => `
+                <tr>
+                  <td class="dato">${TABELLDATO.format(new Date(o.start))} ${Logg.klokkeslett(new Date(o.start))}</td>
+                  <td>${o.type === 'kartlegging' ? 'Kartlegging' : 'Spill'}
+                    ${o.regelsettNavn ? `<span class="tabell-under">${esc(o.regelsettNavn)}</span>` : ''}</td>
+                  <td class="tall">${Logg.bruddTotalt(o)}</td>
+                  <td class="tall">${Logg.minutterMedBrudd(o)} av ${o.intervaller.length}</td>
+                  <td>${jaNei(o.maalNaadd)}</td>
+                  <td>${o.sjekklisteFullfort === null ? '' : o.sjekklisteFullfort ? 'Fullført' : 'Ikkje fullført'}</td>
+                  <td>${esc(o.klassensValg ?? '')}</td>
+                </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        </section>`}
+    </main>`;
+
+  topplinje(hjem);
+  app.querySelector('#kartlegg')?.addEventListener('click', () => vis(kartleggingStart));
+  app.querySelector('#csv')?.addEventListener('click', () =>
+    lastNed(`klassespillet-${k.navn.replace(/[^\p{L}\p{N}]+/gu, '')}-${Logg.dato(new Date())}.csv`, Logg.tilCsv(k)));
+  const beholder = app.querySelector('.diagram');
+  if (beholder) stopp = lagDiagram(beholder, okter);
+  app.querySelector('#topp-tilbake').focus();
+}
+
+document.querySelector('#om').onclick = visOm;
+vis(tilstand.pagaende ? spill : velkomst);
+
+// Frakoblet bruk. Ikke på localhost, så endringer under utvikling vises med en gang.
+if ('serviceWorker' in navigator && location.hostname !== 'localhost') {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
