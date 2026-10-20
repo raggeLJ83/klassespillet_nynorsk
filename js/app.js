@@ -85,7 +85,7 @@ function bekreftForlat(videre) {
   const d = document.createElement('dialog');
   d.className = 'dialog';
   d.innerHTML = `
-    <p>Du har endringer som ikkje er lagra.</p>
+    <p>Du har endringar som ikkje er lagra.</p>
     <form method="dialog" class="hjem-knapper">
       <button class="knapp knapp-hoved" value="bli">Hald fram med å redigere</button>
       <button class="knapp knapp-stille" value="forkast">Forkast endringane</button>
@@ -126,8 +126,8 @@ function hjem() {
   const variant = k.variant ?? 'rolig';
   const mal = {
     rolig: `Kom til felt ${inn.maalfelt}, så trekkjer de klassens val.`,
-    brudd: `Hald dykk under ${inn.bruddgrense} brudd, så trekkjer de klassens val.`,
-    lag: `Spel i ${inn.antallLag === 3 ? 'tre' : 'to'} lag. Får ett lag minst ${inn.stjernekrav} stjerner, trekkjer heile klassen klassens val.`,
+    brudd: `Hald dykk under ${inn.bruddgrense} brot, så trekkjer de klassens val.`,
+    lag: `Spel i ${inn.antallLag === 3 ? 'tre' : 'to'} lag. Får minst eitt lag ${inn.stjernekrav} stjerner, trekkjer heile klassen klassens val.`,
   }[variant];
   const nye = Logg.trengerNyeForslag(k);
   forHjem(`
@@ -153,7 +153,7 @@ function hjem() {
           </div>` : ''}
         <nav class="hjem-lenker" aria-label="Klassen">
           <button class="lenke" id="endre">Endre oppsett</button>
-          <button class="lenke" id="klasser">${tilstand.klasser.length > 1 ? 'Bytt klasse' : 'Ny klasse'}</button>
+          <button class="lenke" id="klasser">${tilstand.klasser.length > 1 ? 'Byt klasse' : 'Ny klasse'}</button>
         </nav>`, { brett: variant === 'rolig' });
   topplinje(null);
   app.querySelector('#start').onclick = () => vis(sjekkliste);
@@ -178,9 +178,9 @@ function velkomst() {
       <div class="velkomst-landskap" aria-hidden="true"></div>
       <section class="velkomst-innhold">
         <h1>Klassespillet</h1>
-        <p class="velkomst-ingress">Good Behavior Game på tavla. Vel speletid, tre reglar, heile klassen saman.</p>
+        <p class="velkomst-ingress">Good Behavior Game på tavla. Vel speletid og tre reglar, og spel saman som klasse.</p>
         <button class="knapp knapp-hoved" id="videre">Start</button>
-        <p class="velkomst-fra">© Lærarliv 2026</p>
+        <p class="velkomst-fra">© Lærerliv 2026</p>
       </section>
     </main>`;
   const bilde = lagLandskap(7, { brett: false });
@@ -232,10 +232,10 @@ function forHjem(innhold, { brett = true } = {}) {
 }
 
 const SJEKKPUNKTER = [
-  'Reglene er gjennomgått med eksempler.',
-  'Klassen vet hva som skal til for å vinne.',
-  'Listen med klassens val er klar.',
-  'Tidspunktet passer: ro etter friminutt, selvstendig arbeid eller tavleundervisning.',
+  'Reglane er gjennomgått med døme.',
+  'Klassen veit kva som skal til for å vinne.',
+  'Lista med klassens val er klar.',
+  'Tidspunktet passar: ro etter friminutt, sjølvstendig arbeid eller tavleundervisning.',
 ];
 
 // Valg av regelsett før en økt. Reglene vises under, så læreren kan gå gjennom dem.
@@ -280,7 +280,7 @@ function sjekkliste() {
          <p class="hjelp">Du kan velje ny speletid for kvar økt.</p>
        </fieldset>
        <fieldset>
-        <legend class="hjelp">Kryss av det som stemmer. Avkrysningen blir lagra i loggen, så du ser seinare kva økter som var godt førebudd.</legend>
+        <legend class="hjelp">Kryss av det som stemmer. Avkryssinga blir lagra i loggen, slik at du seinare kan sjå kva økter som var godt førebudde.</legend>
         ${SJEKKPUNKTER.map((t, i) => `
           <label class="sjekkpunkt"><input type="checkbox" name="s${i}" /><span>${esc(t)}</span></label>`).join('')}
       </fieldset>
@@ -315,10 +315,10 @@ function kartleggingStart() {
   forHjem(`
     <form class="sjekkliste">
       <h1 class="sjekkliste-tittel">Kartlegging</h1>
-      <p class="hjem-mal">Ti minutt vanleg undervisning, utan spel. Trykk på brot-knappen kvar gong nokon bryt ein regel.</p>
+      <p class="hjem-mal">Ti minutt med vanleg undervisning, utan spel. Trykk på brotknappen kvar gong nokon bryt ein regel.</p>
       ${regelsettVeler(k)}
-      <p class="hjelp">Klassen ser bare landskapet, ikke brettet eller tellingen. Atferd som varer, teller som nytt brudd hvert 15. sekund.
-        Gjør tre til fem kartlegginger på ulike dager, så har du tall å vurdere i loggen.
+      <p class="hjelp">Klassen ser berre landskapet, ikkje brettet eller teljinga. Åtferd som varer, tel som eit nytt brot kvart 15. sekund.
+        Gjer tre til fem kartleggingar på ulike dagar, slik at du får tal å vurdere i loggen.
         ${antall ? `Du har gjort ${antall}.` : ''}</p>
       <div class="hjem-knapper">
         <button class="knapp knapp-hoved" type="submit">Start kartlegging</button>
@@ -340,7 +340,7 @@ function kartleggingStart() {
 
 // Hva målfeltet betyr: brikken går bare i minutter helt uten brudd.
 const maalfeltHjelp = (felt, minutter) =>
-  `Klassen må ha ${felt} av ${minutter} minutter helt uten brudd. Et minutt med ett brudd teller like mye som et minutt med mange.`;
+  `Klassen må ha ${felt} av ${minutter} minutt heilt utan brot. Eitt minutt med eitt brot tel like mykje som eitt minutt med mange.`;
 const tallValg = (fra, til, valgt) => Array.from({ length: til - fra + 1 }, (_, i) => fra + i)
   .map((n) => `<option ${n === valgt ? 'selected' : ''}>${n}</option>`).join('');
 
@@ -368,19 +368,19 @@ function oppsett({ ny = !klasse(), fokus = null } = {}) {
 
         <label class="felt-gruppe">
           <span>Klassenamn</span>
-          <input name="navn" required maxlength="20" placeholder="For døme 9B" value="${esc(k.navn)}" autocomplete="off" />
+          <input name="navn" required maxlength="20" placeholder="Til dømes 7B" value="${esc(k.navn)}" autocomplete="off" />
         </label>
 
         <fieldset class="felt-gruppe">
           <legend>Regelsett</legend>
-          <p class="hjelp">Vel situasjonene du vil spele i. Før kvar økt veler du hvilket regelsett som gjeld.
+          <p class="hjelp">Vel situasjonane du vil spele i. Før kvar økt vel du kva regelsett som skal gjelde.
             Kva som tel som brot, står berre her, ikkje på tavla. Åtferd som varer, blir registrert som nytt brot kvart 15. sekund.</p>
           <div class="regelsett-liste"></div>
           <div><button class="knapp knapp-stille" type="button" id="nytt-regelsett">Lag eige regelsett</button></div>
         </fieldset>
 
         <fieldset class="felt-gruppe">
-          <legend>Spillform</legend>
+          <legend>Spelform</legend>
           <p class="hjelp">Forskinga fann ingen tydeleg skilnad mellom spelformene. Vel den du klarer å gjennomføre.</p>
           <div class="variant-liste">
             <div class="regelsett-kort variant-kort">
@@ -394,7 +394,7 @@ function oppsett({ ny = !klasse(), fokus = null } = {}) {
             </div>
             <div class="regelsett-kort variant-kort">
               <label class="avkrysning"><input type="radio" name="variant" value="brudd" ${variant === 'brudd' ? 'checked' : ''} />
-                <span><strong>Skodde</strong><span class="hjelp">Heile klassen er eitt lag. Kvart brot tel, og ein sky driv inn over fjellet. Klassen ser teljinga og får ein felles påminnelse, «Hugs reglane», utan at nokon blir peika ut.</span></span></label>
+                <span><strong>Skodde</strong><span class="hjelp">Heile klassen er eitt lag. Kvart brot tel, og ein sky driv inn over fjellet. Klassen ser teljinga og får ei felles påminning, «Hugs reglane», utan at nokon blir peika ut.</span></span></label>
               <div class="variant-felt">
                 <label class="felt-rad"><span>Grense</span>
                   <select name="bruddgrense">${tallValg(3, 20, inn.bruddgrense)}</select></label>
@@ -412,7 +412,7 @@ function oppsett({ ny = !klasse(), fokus = null } = {}) {
                     <select name="stjernekrav">${tallValg(5, 10, inn.stjernekrav)}</select></label>
                 </div>
                 <p class="hjelp">Heile klassen trekkjer klassens val når minst eitt lag når kravet.
-                  Del klassen etter kvar elevane sit. Appen lagrar ikkje kven som er på hvilket lag. To lag gir betre oversikt enn tre.</p>
+                  Del klassen etter kvar elevane sit. Appen lagrar ikkje kven som er på kva lag. To lag gir betre oversikt enn tre.</p>
               </div>
             </div>
           </div>
@@ -422,14 +422,14 @@ function oppsett({ ny = !klasse(), fokus = null } = {}) {
           <label for="klassens-valg"><span class="felt-navn">Klassens val, eitt per linje</span></label>
           <textarea id="klassens-valg" name="klassensValg" rows="6">${esc(k.klassensValg.join('\n'))}</textarea>
           <button type="button" class="knapp knapp-stille" id="stjerne-lodd">Bruk seks ferdige stjernelodd (5 × ⭐, 1 × ⭐⭐)</button>
-          <p class="hjelp">Bruk forslaga elevane har skrevet på lappar. Eit godt forslag er realistisk, tek rundt ti minutt og gjeld heile klassen.</p>
+          <p class="hjelp">Bruk forslaga elevane har skrive på lappar. Eit godt forslag er realistisk, tek rundt ti minutt og gjeld heile klassen.</p>
           <details class="forslag">
-            <summary>Startliste du kan vele frå</summary>
+            <summary>Startliste du kan velje frå</summary>
             <ul class="forslag-liste">
               ${FORSLAG.map((f) => `<li><button type="button" class="forslag-knapp">${esc(f)}</button></li>`).join('')}
             </ul>
-            <p class="hjelp">Sjekk skolens reglar for tilsyn før de går ut tidlig.
-              Unngå fritak frå lekser, prøver eller vurdering, mat og godteri, og alt som gir enkeltelever fordeler.</p>
+            <p class="hjelp">Sjekk skulen sine reglar for tilsyn før de går ut tidleg.
+              Unngå fritak frå lekser, prøver eller vurdering, mat og godteri og alt som gir einskilde elevar fordelar.</p>
           </details>
         </div>
 
@@ -438,7 +438,7 @@ function oppsett({ ny = !klasse(), fokus = null } = {}) {
           <label class="avkrysning"><input type="checkbox" name="visTidtaker" ${inn.visTidtaker ? 'checked' : ''} /> Vis tida for elevane</label>
           <label class="avkrysning"><input type="checkbox" name="animasjon" ${inn.animasjon ? 'checked' : ''} /> Animer brikka og sola</label>
           <label class="avkrysning"><input type="checkbox" name="rospaaminnelse" ${inn.rospaaminnelse ? 'checked' : ''} /> Minn meg på å rose klassen</label>
-          <p class="hjelp">Kvart andre minutt står det ein liten, dempet setning ved knappane dine, med ros ut frå reglane. Sei den berre når den stemmer.</p>
+          <p class="hjelp">Kvart andre minutt står det ein liten, dempa setning ved knappane dine, med ros ut frå reglane. Sei det berre når det stemmer.</p>
         </fieldset>
 
         <p class="skjema-feil" role="alert" hidden></p>
@@ -449,14 +449,14 @@ function oppsett({ ny = !klasse(), fokus = null } = {}) {
         ${ny ? '' : `
           <div class="slett-klasse">
             <button class="lenke" type="button" id="slett">Slett ${esc(k.navn)}</button>
-            <p class="hjelp">Sletter klassen, regelsettene og heile loggen på denne maskinen.</p>
+            <p class="hjelp">Slettar klassen, regelsetta og heile loggen på denne maskina.</p>
           </div>`}
       </form>
       <dialog class="dialog" id="bekreft-slett">
-        <p>Slette ${esc(k.navn)} og hele loggen? Dette kan ikke angres. Last ned CSV fra loggen først om du vil ta vare på tallene.</p>
+        <p>Vil du slette ${esc(k.navn)} og heile loggen? Dette kan ikkje angrast. Last ned CSV frå loggen først dersom du vil ta vare på tala.</p>
         <form method="dialog" class="hjem-knapper">
           <button class="knapp knapp-hoved" value="ja">Slett klassen</button>
-          <button class="knapp knapp-stille" value="nei" autofocus>Behold</button>
+          <button class="knapp knapp-stille" value="nei" autofocus>Behald</button>
         </form>
       </dialog>
     </main>`;
@@ -474,7 +474,7 @@ function oppsett({ ny = !klasse(), fokus = null } = {}) {
             ${b
               ? `<label class="avkrysning"><input type="checkbox" data-bruk="${i}" ${r.valgt ? 'checked' : ''} />
                   <span><strong>${esc(b.navn)}</strong><span class="hjelp">${esc(b.om)}</span></span></label>`
-              : `<input data-navn="${i}" value="${esc(r.sett.navn)}" placeholder="Navn, for døme Lab-arbeid" aria-label="Navn på eige regelsett" maxlength="40" />
+              : `<input data-navn="${i}" value="${esc(r.sett.navn)}" placeholder="Namn, til dømes laboratoriearbeid" aria-label="Namn på eige regelsett" maxlength="40" />
                  <button class="lenke" type="button" data-fjern="${i}">Fjern</button>`}
           </div>
           <details ${i === apne ? 'open' : ''}>
@@ -485,9 +485,9 @@ function oppsett({ ny = !klasse(), fokus = null } = {}) {
                 <li>
                   <label class="regel-felt"><span>Regel</span>
                     <textarea data-regel="${i}.${j}" rows="1" aria-label="Regel ${j + 1}"
-                      placeholder="${j === 3 ? 'Fjerde regel, valgfri' : 'Skriv det elevene skal gjøre'}">${esc(p.tekst)}</textarea></label>
+                      placeholder="${j === 3 ? 'Fjerde regel, valfri' : 'Skriv det elevane skal gjere'}">${esc(p.tekst)}</textarea></label>
                   <label class="regel-felt brot-felt"><span>Brot</span>
-                    <textarea data-brudd="${i}.${j}" rows="1" aria-label="Hva som teller som brudd på regel ${j + 1}"
+                    <textarea data-brudd="${i}.${j}" rows="1" aria-label="Kva som tel som brot på regel ${j + 1}"
                       placeholder="Det du registrerer">${esc(p.brudd)}</textarea></label>
                 </li>`).join('')}
             </ol>
@@ -587,16 +587,16 @@ function oppsett({ ny = !klasse(), fokus = null } = {}) {
       felt.focus();
     };
 
-    if (!navn) return visFeil('Klassen trenger et navn.', form.elements.navn);
-    if (!valgte.length) return visFeil('Vel minst ett regelsett.', liste.querySelector('[data-bruk]'));
+    if (!navn) return visFeil('Klassen treng eit namn.', form.elements.navn);
+    if (!valgte.length) return visFeil('Vel minst eitt regelsett.', liste.querySelector('[data-bruk]'));
     for (const r of valgte) {
       const i = rader.indexOf(r);
-      if (!r.sett.navn) return visFeil('Gi det egne regelsettet et navn.', liste.querySelector(`[data-navn="${i}"]`));
+      if (!r.sett.navn) return visFeil('Gi det eigne regelsettet eit namn.', liste.querySelector(`[data-navn="${i}"]`));
       const tomme = r.sett.regler.findIndex((x) => !x.tekst);
       if (r.sett.regler.filter((x) => x.tekst).length < 3 || tomme !== -1) {
         tegnRegelsett(i);
         const j = tomme !== -1 ? tomme : r.sett.regler.length;
-        return visFeil(`${r.sett.navn} trenger tre regler. En fjerde er valgfri.`, liste.querySelector(`[data-regel="${i}.${Math.min(j, 3)}"]`));
+        return visFeil(`${r.sett.navn} treng tre reglar. Ein fjerde er valfri.`, liste.querySelector(`[data-regel="${i}.${Math.min(j, 3)}"]`));
       }
     }
 
@@ -643,17 +643,17 @@ const PAMINNELSE_VARER = 3500;
 function maaler(okt) {
   if (okt.variant === 'brudd') {
     return `
-      <section class="maaler maaler-brot" aria-label="Brudd">
+      <section class="maaler maaler-brot" aria-label="Brot">
         <p class="maaler-tall"><span class="maaler-n">0</span> brot</p>
         <ol class="brudd-rekke" aria-hidden="true">${Array.from({ length: okt.bruddgrense }, (_, i) =>
           `<li class="${i === okt.bruddgrense - 1 ? 'grense' : ''}"></li>`).join('')}<li class="over" hidden></li></ol>
-        <p class="maaler-tekst">Under ${okt.bruddgrense} brudd, så trekkjer de klassens val.</p>
+        <p class="maaler-tekst">Under ${okt.bruddgrense} brot, så trekkjer de klassens val.</p>
         <p class="paminnelse" aria-live="polite">Hugs reglane</p>
       </section>`;
   }
   return `
     <section class="maaler maaler-lag">
-      <p class="maaler-tekst">Minst ett lag med ${okt.stjernekrav} stjerner, så trekkjer heile klassen klassens val.</p>
+      <p class="maaler-tekst">Minst eitt lag med ${okt.stjernekrav} stjerner, så trekkjer heile klassen klassens val.</p>
     </section>`;
 }
 
@@ -681,7 +681,7 @@ function spill() {
         <div class="nedtelling" aria-live="assertive"></div>
         <div class="pause-lag" hidden><p>Pause</p></div>
         <section class="resultat" hidden aria-live="polite"></section>
-        <aside class="styring" aria-label="Lærarens knapper">
+        <aside class="styring" aria-label="Knappane til læraren">
           ${ros ? '<p class="ros" hidden></p>' : ''}
           <span class="markering" aria-hidden="true"></span>
           ${lag > 1
@@ -699,9 +699,9 @@ function spill() {
           <ol style="--antall: ${rs.regler.length}">${rs.regler.map((r) => `<li>${esc(r)}</li>`).join('')}</ol>
         </footer>`}
       <dialog class="dialog" id="bekreft">
-        <p>Avslutte ${kartlegging ? 'kartleggingen' : 'økten'} nå? Den blir ikke lagret i loggen.</p>
+        <p>Avslutte ${kartlegging ? 'kartlegginga' : 'økta'} nå? Ho blir ikkje lagra i loggen.</p>
         <form method="dialog" class="hjem-knapper">
-          <button class="knapp knapp-hoved" value="ja">Avslutt ${kartlegging ? 'kartleggingen' : 'økten'}</button>
+          <button class="knapp knapp-hoved" value="ja">Avslutt ${kartlegging ? 'kartlegginga' : 'økta'}</button>
           <button class="knapp knapp-stille" value="nei" autofocus>Hald fram</button>
         </form>
       </dialog>
@@ -870,8 +870,8 @@ function spill() {
     const n = okt.brudd.length;
     panel.innerHTML = `
       <h2>Kartlegging ferdig</h2>
-      <p>${n === 1 ? 'Eitt brot' : `${n} brudd`} på ti minutter.</p>
-      <button class="knapp knapp-hoved" id="ferdig">Se loggen</button>`;
+      <p>${n === 1 ? 'Eitt brot' : `${n} brot`} på ti minutt.</p>
+      <button class="knapp knapp-hoved" id="ferdig">Sjå loggen</button>`;
     const knapp = panel.querySelector('#ferdig');
     knapp.onclick = () => {
       k.okter.push(Okt.tilLoggpost(okt));
@@ -883,12 +883,12 @@ function spill() {
   }
 
   function ikkeNaadd() {
-    if (variant === 'brudd') return `Dere hadde ${okt.brudd.length} brudd. Grensen var ${okt.bruddgrense}.`;
+    if (variant === 'brudd') return `De hadde ${okt.brudd.length} brot. Grensa var ${okt.bruddgrense}.`;
     if (variant === 'lag') {
-      const s = Array.from({ length: lag }, (_, l) => `lag ${l + 1} fikk ${Okt.posisjon(okt, Infinity, l)}`);
-      return `Det trengs ${okt.stjernekrav} stjerner. ${s.join(', ').replace(/^l/, 'L').replace(/, ([^,]*)$/, ' og $1')}.`;
+      const s = Array.from({ length: lag }, (_, l) => `lag ${l + 1} fekk ${Okt.posisjon(okt, Infinity, l)}`);
+      return `Det trengst ${okt.stjernekrav} stjerner. ${s.join(', ').replace(/^l/, 'L').replace(/, ([^,]*)$/, ' og $1')}.`;
     }
-    return `Brikken kom til felt ${Okt.posisjon(okt)}.`;
+    return `Brikka kom til felt ${Okt.posisjon(okt)}.`;
   }
 
   function visResultat() {
@@ -1008,7 +1008,7 @@ function spill() {
   };
   document.addEventListener('keydown', taster);
 
-  // Hold skjermen våken under økten der nettleseren støtter det.
+  // Hold skjermen våken under økta der nettleseren støtter det.
   let vaaken = null;
   const hold = () => navigator.wakeLock?.request('screen').then((l) => { vaaken = l; }).catch(() => {});
   hold();
@@ -1084,30 +1084,30 @@ function kartleggingsvurdering(okter) {
     return `
       <section class="vurdering">
         <h2>Kartlegging</h2>
-        <p>Du har gjort ${antall} av minst ${Logg.KARTLEGGINGER_FOR_VURDERING} kartlegginger. Gjør resten på ulike dager før du vurderer om klassen trenger spillet.</p>
+        <p>Du har gjennomført ${antall} av minst ${Logg.KARTLEGGINGER_FOR_VURDERING} kartleggingar. Gjer resten på ulike dagar før du vurderer om klassen treng spelet.</p>
       </section>`;
   }
   return `
     <section class="vurdering">
-      <h2>Trenger klassen spelet?</h2>
+      <h2>Treng klassen spelet?</h2>
       <dl class="vurdering-tall">
         <div><dt>Snitt</dt><dd>${tall(o.snitt)}</dd></div>
-        <div><dt>Lavest</dt><dd>${o.lavest}</dd></div>
-        <div><dt>Høyest</dt><dd>${o.hoyest}</dd></div>
+        <div><dt>Lågast</dt><dd>${o.lavest}</dd></div>
+        <div><dt>Høgast</dt><dd>${o.hoyest}</dd></div>
       </dl>
-      <p class="hjelp">Brot per kartlegging, de ${o.antall} siste.</p>
-      <p>I studiane lå klassane som fikk tiltaket på 39 til 142 brot per ti minutt før spelet, og stort sett på 0 til 21 under spelet.
-        Tallene vart registrert av trenede observatører i barneskoleklasser. De er ikkje ein grense for når ein klasse treng spelet.
-        Se på om tala dine er stabile over fleire målinger, og vurder sjølv.</p>
-      <p>Eit lavt og stabilt nivå tyder på at klassen ikkje treng spelet. Spelar de, viser diagrammet om brota går ned.</p>
+      <p class="hjelp">Brot per kartlegging, dei ${o.antall} siste.</p>
+      <p>I studiane låg klassane som fekk tiltaket på 39 til 142 brot per ti minutt før spelet, og stort sett på 0 til 21 under spelet.
+        Tala vart registrerte av opplærte observatørar i klassar på barnetrinnet. Dei er ikkje ei grense for når ein klasse treng spelet.
+        Sjå om tala dine er stabile over fleire målingar, og vurder sjølv.</p>
+      <p>Eit lågt og stabilt nivå tyder på at klassen ikkje treng spelet. Spelar de, viser diagrammet om brota går ned.</p>
       <details class="forbehold">
-        <summary>Forbehold og kilder</summary>
+        <summary>Atterhald og kjelder</summary>
         <ul>
-          <li>Observatørene i studiane var trent i to veker, satt bakerst og underviste ikkje. Ein lærar som underviser samstundes, registrerer trolig færre brot enn det som faktisk skjer.</li>
-          <li>Tallene kan berre sammenlignes når brot defineres og blir registrert likt, mellom anna med nytt brot kvart 15. sekund når atferden varer.</li>
-          <li>Alle klassane gjekk på barnetrinnet, og spelet vart ledet av studenter, ikkje lærarar.</li>
+          <li>Observatørane i studiane hadde fått opplæring i to veker, sat bakarst og underviste ikkje. Ein lærar som underviser samstundes, registrerer truleg færre brot enn det som faktisk skjer.</li>
+          <li>Tala kan berre samanliknast når brot blir definerte og registrerte likt, mellom anna med eit nytt brot kvart 15. sekund når åtferda varer.</li>
+          <li>Alle klassane gjekk på barnetrinnet, og spelet vart leia av studentar, ikkje lærarar.</li>
           <li>Grunnlaget er fire klassar.</li>
-          <li>Stabilitet og trend betyr like mykje som nivået. Forskerne utelot òg klassar der tala steg eller svinget mykje.</li>
+          <li>Stabilitet og trend betyr like mykje som nivået. Forskarane utelét òg klassar der tala steig eller svinga mykje.</li>
         </ul>
         <p class="hjelp">Stangjordet, Isaksen og Strømgren (2026) og Isaksen mfl. (2026), Norsk Tidsskrift for Atferdsanalyse 53, s. 31–57.</p>
       </details>
@@ -1129,7 +1129,7 @@ function logg() {
       </header>
       ${okter.length === 0 ? `
         <section class="logg-tom">
-          <p>Ingen økter enno. Loggen fylles når du fullfører ein økt eller ein kartlegging.</p>
+          <p>Ingen økter enno. Loggen blir fylt når du fullfører ei økt eller ei kartlegging.</p>
           <div class="hjem-knapper">
             <button class="knapp knapp-stille" id="kartlegg">Kartlegg klassen</button>
           </div>
@@ -1148,7 +1148,7 @@ function logg() {
               <tbody>${[...okter].reverse().map((o) => `
                 <tr>
                   <td class="dato">${TABELLDATO.format(new Date(o.start))} ${Logg.klokkeslett(new Date(o.start))}</td>
-                  <td>${o.type === 'kartlegging' ? 'Kartlegging' : 'Spill'}
+                  <td>${o.type === 'kartlegging' ? 'Kartlegging' : 'Spel'}
                     ${o.regelsettNavn ? `<span class="tabell-under">${esc(o.regelsettNavn)}</span>` : ''}</td>
                   <td class="tall">${Logg.bruddTotalt(o)}</td>
                   <td class="tall">${Logg.minutterMedBrudd(o)} av ${o.intervaller.length}</td>
