@@ -1,47 +1,77 @@
-// Regelbiblioteket og startlisten for klassens val. Tekstene står i planen, avsnitt 5.9 og 5.10.
+// Regelbiblioteket og startlista for klassens val.
 
 export const MAKS_REGLER = 4;
 
 export const BIBLIOTEK = [
   {
     mal: 'tavle',
-    navn: 'Tavleundervisning',
-    om: 'Læraren eller en elev har ordet.',
+    navn: 'Gjennomgang på tavla',
+    om: 'Felles gjennomgang der læraren eller ein elev har ordet.',
     regler: [
-      { tekst: 'Eg er stille når nokon har ordet.', brudd: 'Prat, hvisking eller lyd når andre har ordet.' },
-      { tekst: 'Eg rekk opp handa når eg vil seie noko.', brudd: 'Å snakke uten ordet, også om fag.' },
-      { tekst: 'Eg sit vend mot tavla.', brudd: 'Å snu seg for å prate, eller sitte med ryggen til.' },
+      { tekst: 'Me følgjer med og har blikket mot den som snakkar.', brudd: 'Å drive med andre aktivitetar eller vende seg bort frå gjennomgangen over tid.' },
+      { tekst: 'Me rekkjer opp handa og ventar på tur.', brudd: 'Å rope ut eller snakke utan å ha fått ordet.' },
+      { tekst: 'Me lyttar til kvarandre utan å avbryte.', brudd: 'Å avbryte eller snakke medan andre har ordet.' },
+    ],
+  },
+  {
+    mal: 'stillelesing',
+    navn: 'Stillelesing',
+    om: 'Alle les kvar si bok i ro.',
+    regler: [
+      { tekst: 'Me les i boka vår utan å snakke.', brudd: 'Å snakke eller lage lydar som forstyrrar lesinga.' },
+      { tekst: 'Me sit på plassen vår og held på med lesinga.', brudd: 'Å gå frå plassen utan avtale eller drive med andre aktivitetar.' },
+      { tekst: 'Me lèt andre lese i fred.', brudd: 'Å forstyrre andre som les.' },
+    ],
+  },
+  {
+    mal: 'kahoot',
+    navn: 'Kahoot',
+    om: 'Quiz med rom for latter og jubel, men med ro mellom spørsmåla.',
+    regler: [
+      { tekst: 'Me svarar på vår eigen Kahoot utan å forstyrre andre.', brudd: 'Å sjå på andre sine svar eller forstyrre nokon medan dei svarar.' },
+      { tekst: 'Me kan juble og le, men ikkje rope eller kommentere andre sine svar.', brudd: 'Å rope høgt, håne andre eller kommentere svara deira.' },
+      { tekst: 'Me kjem raskt til ro mellom kvart spørsmål.', brudd: 'Å halde fram med høglydt prat eller lydar når neste spørsmål skal starte.' },
     ],
   },
   {
     mal: 'pc',
     navn: 'Sjølvstendig arbeid på PC',
-    om: 'Elevene jobber alene på egen PC.',
-    merknad: 'Studiene målte bare atferd som synes fra der læreren står, ikke skjermbruk. Reglene virker bare om du faktisk ser skjermene, for eksempel når du går rundt bak elevene. Er du usikker, registrerer du ikke brudd.',
+    om: 'Elevane arbeider kvar for seg på eigen PC.',
+    merknad: 'Registrer berre brot du faktisk kan observere. Dersom du ikkje ser skjermane, skal du ikkje registrere brot på skjermbruk.',
     regler: [
-      { tekst: 'Eg har berre skulearbeidet ope.', brudd: 'Spill, video, sosiale medier eller andre sider.' },
-      { tekst: 'Chat og meldingar er lukka.', brudd: 'Å skrive eller lese meldinger.' },
-      { tekst: 'Eg sit på plassen min.', brudd: 'Å forlate plassen uten lov.' },
+      { tekst: 'Me har berre skulearbeidet ope.', brudd: 'Å bruke spel, videoar, sosiale medium eller andre sider som ikkje høyrer til oppgåva.' },
+      { tekst: 'Me har chat og meldingar lukka.', brudd: 'Å skrive eller lese meldingar som ikkje høyrer til oppgåva.' },
+      { tekst: 'Me sit på plassen vår.', brudd: 'Å forlate plassen utan avtale.' },
     ],
   },
   {
     mal: 'uten-pc',
     navn: 'Sjølvstendig arbeid utan PC',
-    om: 'Elevene jobber alene med bok eller ark.',
+    om: 'Elevane arbeider kvar for seg med bok eller ark.',
     regler: [
-      { tekst: 'Eg jobbar stille. Eg kviskrar berre om oppgåva.', brudd: 'Prat som flere enn sidemann hører, eller om annet.' },
-      { tekst: 'Eg rekk opp handa når eg treng hjelp.', brudd: 'Å rope på eller gå til læreren uten lov.' },
-      { tekst: 'Eg sit på plassen min.', brudd: 'Å forlate plassen uten lov.' },
+      { tekst: 'Me arbeider stille og kviskrar berre om oppgåva.', brudd: 'Høglydt prat eller samtalar som ikkje handlar om oppgåva.' },
+      { tekst: 'Me rekkjer opp handa når me treng hjelp.', brudd: 'Å rope på læraren eller forlate plassen for å be om hjelp utan avtale.' },
+      { tekst: 'Me sit på plassen vår.', brudd: 'Å forlate plassen utan avtale.' },
     ],
   },
   {
     mal: 'oppstart',
-    navn: 'Oppstart av time',
-    om: 'De første minuttene av timen.',
+    navn: 'Oppstart av timen',
+    om: 'Dei første minutta av timen.',
     regler: [
-      { tekst: 'Eg sit på plassen min når timen startar.', brudd: 'Å ikke sitte på plassen når timen starter.' },
-      { tekst: 'PC-en er lukka til læraren seier noko anna.', brudd: 'Åpen skjerm.' },
-      { tekst: 'Eg er stille når læraren gir beskjed.', brudd: 'Prat eller lyd mens læreren gir beskjed.' },
+      { tekst: 'Me finn plassane våre raskt.', brudd: 'Å bli ståande eller gå rundt etter at timen har starta.' },
+      { tekst: 'Me har utstyret klart.', brudd: 'Å ikkje finne fram avtalt utstyr etter beskjed og rimeleg tid.' },
+      { tekst: 'Me er stille når læraren gir beskjed.', brudd: 'Prat eller forstyrrande lydar medan læraren gir beskjed.' },
+    ],
+  },
+  {
+    mal: 'gruppe',
+    navn: 'Samarbeid i grupper',
+    om: 'Elevane arbeider saman om ei felles oppgåve.',
+    regler: [
+      { tekst: 'Me brukar innestemme.', brudd: 'Å rope eller snakke så høgt at andre grupper blir forstyrra.' },
+      { tekst: 'Me lèt alle bidra.', brudd: 'Å avbryte, stengje andre ute eller ikkje gi dei høve til å delta.' },
+      { tekst: 'Me held oss til oppgåva.', brudd: 'Prat eller aktivitetar som ikkje høyrer til oppgåva.' },
     ],
   },
 ];
@@ -67,15 +97,8 @@ export const FORSLAG = [
   '⭐⭐ 2 stjerner',
 ];
 
-// Gjør en regel om til en setning læreren kan si: «Eg sit på plassen min.»
-// blir «Jeg ser at mange sitter på plassen sin. Flott!» Reglar som ikke starter
-// med «Jeg», roses som de står.
+// Kort roseforslag som fungerer med reglar i «Me»-form.
 export function rosForslag(regel) {
-  const forste = regel.split('.')[0].trim();
-  const m = forste.match(/^Jeg (\S+)(.*)$/);
-  if (!m) return `Flott! ${forste}.`;
-  const resten = m[2]
-    .replace(/\bmin\b/g, 'sin').replace(/\bmitt\b/g, 'sitt').replace(/\bmine\b/g, 'sine')
-    .replace(/\bmeg\b/g, 'seg').replace(/\bjeg\b/g, 'de');
-  return `Jeg ser at mange ${m[1]}${resten}. Flott!`;
+  const tekst = String(regel).trim().replace(/[.!?]+$/, '');
+  return `Flott innsats! De følgjer regelen «${tekst}».`;
 }
